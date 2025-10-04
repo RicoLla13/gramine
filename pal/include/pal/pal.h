@@ -28,7 +28,7 @@
  * declare a dependency on it. */
 typedef struct toml_table_t toml_table_t;
 
-typedef uint32_t    PAL_IDX; /*!< an index */
+typedef uint32_t PAL_IDX; /*!< an index */
 
 /* maximum length of URIs */
 #define URI_MAX 4096
@@ -40,7 +40,7 @@ typedef uint32_t    PAL_IDX; /*!< an index */
 #define PAL_MAX_NAMESPACES 3
 #define PAL_MAX_DN_SEARCH  6
 
-#define MAX_IPV6_ADDR_LEN  40
+#define MAX_IPV6_ADDR_LEN 40
 
 /* Common types used by host specific header. */
 enum pal_socket_domain {
@@ -148,13 +148,13 @@ struct pal_public_state {
     /*
      * Memory layout
      */
-    bool disable_aslr;                      /*!< disable ASLR */
-    void* memory_address_start;             /*!< usable memory start address */
-    void* memory_address_end;               /*!< usable memory end address */
-    uintptr_t early_libos_mem_range_start;  /*!< start of memory usable before checkpoint restore */
-    uintptr_t early_libos_mem_range_end;    /*!< end of memory usable before checkpoint restore */
-    void* shared_address_start;             /*!< usable shared memory start address */
-    void* shared_address_end;               /*!< usable shared memory end address */
+    bool disable_aslr;                     /*!< disable ASLR */
+    void* memory_address_start;            /*!< usable memory start address */
+    void* memory_address_end;              /*!< usable memory end address */
+    uintptr_t early_libos_mem_range_start; /*!< start of memory usable before checkpoint restore */
+    uintptr_t early_libos_mem_range_end;   /*!< end of memory usable before checkpoint restore */
+    void* shared_address_start;            /*!< usable shared memory start address */
+    void* shared_address_end;              /*!< usable shared memory end address */
 
     struct pal_initial_mem_range* initial_mem_ranges; /*!< array of initial memory ranges, see
                                                            `pal_memory.c` for more details */
@@ -192,10 +192,10 @@ struct pal_public_state* PalGetPalPublicState(void);
 
 /*! memory protection flags */
 typedef uint32_t pal_prot_flags_t; /* bitfield */
-#define PAL_PROT_READ       0x1
-#define PAL_PROT_WRITE      0x2
-#define PAL_PROT_EXEC       0x4
-#define PAL_PROT_WRITECOPY  0x8
+#define PAL_PROT_READ      0x1
+#define PAL_PROT_WRITE     0x2
+#define PAL_PROT_EXEC      0x4
+#define PAL_PROT_WRITECOPY 0x8
 #define PAL_PROT_LAZYALLOC 0x10
 #define PAL_PROT_MASK      0x1F
 
@@ -307,15 +307,15 @@ enum pal_access {
 // FIXME: These flags currently must correspond 1-1 to Linux flags, which is totally unportable.
 //        They should be redesigned when we'll be rewriting the filesystem layer.
 typedef uint32_t pal_share_flags_t; /* bitfield */
-#define PAL_SHARE_GLOBAL_X    01
-#define PAL_SHARE_GLOBAL_W    02
-#define PAL_SHARE_GLOBAL_R    04
-#define PAL_SHARE_GROUP_X    010
-#define PAL_SHARE_GROUP_W    020
-#define PAL_SHARE_GROUP_R    040
-#define PAL_SHARE_OWNER_X   0100
-#define PAL_SHARE_OWNER_W   0200
-#define PAL_SHARE_OWNER_R   0400
+#define PAL_SHARE_GLOBAL_X 01
+#define PAL_SHARE_GLOBAL_W 02
+#define PAL_SHARE_GLOBAL_R 04
+#define PAL_SHARE_GROUP_X  010
+#define PAL_SHARE_GROUP_W  020
+#define PAL_SHARE_GROUP_R  040
+#define PAL_SHARE_OWNER_X  0100
+#define PAL_SHARE_OWNER_W  0200
+#define PAL_SHARE_OWNER_R  0400
 #define PAL_SHARE_STICKY   01000
 #define PAL_SHARE_SET_GID  02000
 #define PAL_SHARE_SET_UID  04000
@@ -323,17 +323,17 @@ typedef uint32_t pal_share_flags_t; /* bitfield */
 
 /*! stream create mode */
 enum pal_create_mode {
-    PAL_CREATE_NEVER,     /*!< Fail if file does not exist */
-    PAL_CREATE_TRY,       /*!< Create file if file does not exist */
-    PAL_CREATE_ALWAYS,    /*!< Create file and fail if file already exists */
-    PAL_CREATE_IGNORED,   /*!< Magic value for calls to handle types which ignore creation mode */
+    PAL_CREATE_NEVER,   /*!< Fail if file does not exist */
+    PAL_CREATE_TRY,     /*!< Create file if file does not exist */
+    PAL_CREATE_ALWAYS,  /*!< Create file and fail if file already exists */
+    PAL_CREATE_IGNORED, /*!< Magic value for calls to handle types which ignore creation mode */
 };
 
 /*! stream misc flags */
 typedef uint32_t pal_stream_options_t; /* bitfield */
-#define PAL_OPTION_EFD_SEMAPHORE   0x1 /*!< specific to `eventfd` syscall */
-#define PAL_OPTION_NONBLOCK        0x2
-#define PAL_OPTION_MASK            0x3
+#define PAL_OPTION_EFD_SEMAPHORE 0x1   /*!< specific to `eventfd` syscall */
+#define PAL_OPTION_NONBLOCK      0x2
+#define PAL_OPTION_MASK          0x3
 
 /*!
  * \brief Open/create a stream resource specified by `uri`.
@@ -404,7 +404,7 @@ int PalStreamRead(PAL_HANDLE handle, uint64_t offset, size_t* count, void* buffe
 int PalStreamWrite(PAL_HANDLE handle, uint64_t offset, size_t* count, void* buffer);
 
 enum pal_delete_mode {
-    PAL_DELETE_ALL,  /*!< delete the whole resource / shut down both directions */
+    PAL_DELETE_ALL,   /*!< delete the whole resource / shut down both directions */
     PAL_DELETE_READ,  /*!< shut down the read side only */
     PAL_DELETE_WRITE, /*!< shut down the write side only */
 };
@@ -812,10 +812,10 @@ void PalEventClear(PAL_HANDLE handle);
 int PalEventWait(PAL_HANDLE handle, uint64_t* timeout_us);
 
 typedef uint32_t pal_wait_flags_t; /* bitfield */
-#define PAL_WAIT_READ     1
-#define PAL_WAIT_WRITE    2
-#define PAL_WAIT_ERROR    4
-#define PAL_WAIT_HANG_UP  8
+#define PAL_WAIT_READ    1
+#define PAL_WAIT_WRITE   2
+#define PAL_WAIT_ERROR   4
+#define PAL_WAIT_HANG_UP 8
 
 /*!
  * \brief Poll - wait for an event to happen on at least one handle.

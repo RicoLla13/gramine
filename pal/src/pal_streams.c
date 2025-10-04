@@ -6,6 +6,7 @@
  */
 
 #include "api.h"
+#include "log.h"
 #include "pal.h"
 #include "pal_error.h"
 #include "pal_internal.h"
@@ -23,16 +24,11 @@ extern struct handle_ops g_event_ops;
 extern struct handle_ops g_eventfd_ops;
 
 const struct handle_ops* g_pal_handle_ops[PAL_HANDLE_TYPE_BOUND] = {
-    [PAL_TYPE_FILE]    = &g_file_ops,
-    [PAL_TYPE_PIPE]    = &g_pipe_ops,
-    [PAL_TYPE_PIPESRV] = &g_pipe_ops,
-    [PAL_TYPE_PIPECLI] = &g_pipe_ops,
-    [PAL_TYPE_CONSOLE] = &g_console_ops,
-    [PAL_TYPE_DEV]     = &g_dev_ops,
-    [PAL_TYPE_DIR]     = &g_dir_ops,
-    [PAL_TYPE_PROCESS] = &g_proc_ops,
-    [PAL_TYPE_THREAD]  = &g_thread_ops,
-    [PAL_TYPE_EVENT]   = &g_event_ops,
+    [PAL_TYPE_FILE] = &g_file_ops,       [PAL_TYPE_PIPE] = &g_pipe_ops,
+    [PAL_TYPE_PIPESRV] = &g_pipe_ops,    [PAL_TYPE_PIPECLI] = &g_pipe_ops,
+    [PAL_TYPE_CONSOLE] = &g_console_ops, [PAL_TYPE_DEV] = &g_dev_ops,
+    [PAL_TYPE_DIR] = &g_dir_ops,         [PAL_TYPE_PROCESS] = &g_proc_ops,
+    [PAL_TYPE_THREAD] = &g_thread_ops,   [PAL_TYPE_EVENT] = &g_event_ops,
     [PAL_TYPE_EVENTFD] = &g_eventfd_ops,
 };
 
@@ -77,7 +73,7 @@ static int split_uri_and_find_ops(const char* typed_uri, char* out_type, const c
 int _PalStreamOpen(PAL_HANDLE* handle, const char* typed_uri, enum pal_access access,
                    pal_share_flags_t share, enum pal_create_mode create,
                    pal_stream_options_t options) {
-    assert(WITHIN_MASK(share,   PAL_SHARE_MASK));
+    assert(WITHIN_MASK(share, PAL_SHARE_MASK));
     assert(WITHIN_MASK(options, PAL_OPTION_MASK));
 
     char type[URI_PREFIX_MAX_LEN + 1];
@@ -186,6 +182,8 @@ int PalStreamWrite(PAL_HANDLE handle, uint64_t offset, size_t* count, void* buff
     if (!handle) {
         return PAL_ERROR_INVAL;
     }
+
+    log_always("From Write Syscall");
 
     int64_t ret = _PalStreamWrite(handle, offset, *count, buffer);
 

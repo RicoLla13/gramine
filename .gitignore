@@ -2,6 +2,9 @@
 /install
 /obj-*
 
+/.cache
+compile_commands.json
+
 # No editor backup files.
 *.sw*
 *.backup
