@@ -6,6 +6,9 @@
  * "pread64", "pwrite64", "getdents", "getdents64", "fsync", "truncate" and "ftruncate".
  */
 
+#include <string.h>
+
+#include "log.h"
 #define _POSIX_C_SOURCE 200809L /* for SSIZE_MAX */
 
 #include <limits.h>
@@ -80,15 +83,26 @@ long libos_syscall_write(int fd, const void* buf, size_t count) {
     if (!is_user_memory_readable((void*)buf, count))
         return -EFAULT;
 
+    log_always("[i] Intercepted write(fd=%d, count=%zu)", fd, count);
+
+    // Print a preview of the buffer (limit to 64 to avoid crash)
+    size_t preview_len = count < 64 ? count : 64;
+    char preview[65];
+    memcpy(preview, buf, preview_len);
+    log_always("[i] Data: \"%s\"", preview);
+
     struct libos_handle* hdl = get_fd_handle(fd, NULL, NULL);
     if (!hdl)
         return -EBADF;
 
     ssize_t ret = do_handle_write(hdl, buf, count);
     put_handle(hdl);
+
     if (ret == -EINTR) {
         ret = -ERESTARTSYS;
     }
+
+    log_always("[i] write() returned %zd", ret);
     return ret;
 }
 
