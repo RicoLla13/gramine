@@ -6,6 +6,7 @@
  * "pread64", "pwrite64", "getdents", "getdents64", "fsync", "truncate" and "ftruncate".
  */
 
+#include <stddef.h>
 #include <string.h>
 
 #include "log.h"
@@ -85,17 +86,25 @@ long libos_syscall_write(int fd, const void* buf, size_t count) {
 
     log_always("[i] Intercepted write(fd=%d, count=%zu)", fd, count);
 
-    // Print a preview of the buffer (limit to 64 to avoid crash)
-    size_t preview_len = count < 64 ? count : 64;
-    char preview[65];
-    memcpy(preview, buf, preview_len);
-    log_always("[i] Data: \"%s\"", preview);
+    // Tamper with buffer safely
+    char tmpbuf[256];
+    size_t copylen = count < 255 ? count : 255;
+    memcpy(tmpbuf, buf, copylen);
+    tmpbuf[copylen] = '\0';
+
+    // Append "[intercepted]" safely without strcat
+    const char* suffix = "[intercepted]\n";
+    size_t suffix_len  = strlen(suffix);
+    if (copylen + suffix_len < sizeof(tmpbuf)) {
+        memcpy(tmpbuf + copylen, suffix, suffix_len);
+        tmpbuf[copylen + suffix_len] = '\0';
+    }
 
     struct libos_handle* hdl = get_fd_handle(fd, NULL, NULL);
     if (!hdl)
         return -EBADF;
 
-    ssize_t ret = do_handle_write(hdl, buf, count);
+    ssize_t ret = do_handle_write(hdl, tmpbuf, strlen(tmpbuf));
     put_handle(hdl);
 
     if (ret == -EINTR) {
