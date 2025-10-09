@@ -6,7 +6,7 @@
  * "pread64", "pwrite64", "getdents", "getdents64", "fsync", "truncate" and "ftruncate".
  */
 
-#define _POSIX_C_SOURCE 200809L  /* for SSIZE_MAX */
+#define _POSIX_C_SOURCE 200809L /* for SSIZE_MAX */
 
 #include <limits.h>
 #include <stdalign.h>
@@ -102,13 +102,12 @@ long libos_syscall_creat(const char* path, mode_t mode) {
 
 long libos_syscall_openat(int dfd, const char* filename, int flags, int mode) {
     /* Clear invalid flags. */
-    flags &= O_ACCMODE | O_APPEND |  O_CLOEXEC | O_CREAT | O_DIRECT | O_DIRECTORY | O_DSYNC | O_EXCL
-             | O_LARGEFILE | O_NOATIME | O_NOCTTY | O_NOFOLLOW | O_NONBLOCK | O_PATH | O_SYNC
-             | O_TMPFILE | O_TRUNC;
+    flags &= O_ACCMODE | O_APPEND | O_CLOEXEC | O_CREAT | O_DIRECT | O_DIRECTORY | O_DSYNC |
+             O_EXCL | O_LARGEFILE | O_NOATIME | O_NOCTTY | O_NOFOLLOW | O_NONBLOCK | O_PATH |
+             O_SYNC | O_TMPFILE | O_TRUNC;
 
-    if (   (flags & O_ACCMODE) != O_RDONLY
-        && (flags & O_ACCMODE) != O_WRONLY
-        && (flags & O_ACCMODE) != O_RDWR)
+    if ((flags & O_ACCMODE) != O_RDONLY && (flags & O_ACCMODE) != O_WRONLY &&
+        (flags & O_ACCMODE) != O_RDWR)
         return -EINVAL;
 
     /* TODO: fail explicitly on valid but unsupported flags. */
@@ -135,7 +134,7 @@ long libos_syscall_openat(int dfd, const char* filename, int flags, int mode) {
     }
 
     struct libos_dentry* dir = NULL;
-    int ret = 0;
+    int ret                  = 0;
 
     if (*filename != '/' && (ret = get_dirfd_dentry(dfd, &dir)) < 0)
         return ret;
@@ -215,7 +214,7 @@ static file_off_t do_lseek_dir(struct libos_handle* hdl, off_t offset, int origi
     if (ret < 0)
         goto out;
     hdl->pos = pos;
-    ret = pos;
+    ret      = pos;
 
 out:
     unlock(&hdl->lock);
@@ -265,7 +264,7 @@ long libos_syscall_pread64(int fd, char* buf, size_t count, loff_t offset) {
         return -EBADF;
 
     struct libos_fs* fs = hdl->fs;
-    ssize_t ret = -EACCES;
+    ssize_t ret         = -EACCES;
 
     if (!(hdl->acc_mode & MAY_READ)) {
         ret = -EBADF;
@@ -289,7 +288,7 @@ long libos_syscall_pread64(int fd, char* buf, size_t count, loff_t offset) {
     }
 
     file_off_t pos = offset;
-    ret = fs->fs_ops->read(hdl, buf, count, &pos);
+    ret            = fs->fs_ops->read(hdl, buf, count, &pos);
 out:
     put_handle(hdl);
     return ret;
@@ -307,7 +306,7 @@ long libos_syscall_pwrite64(int fd, char* buf, size_t count, loff_t offset) {
         return -EBADF;
 
     struct libos_fs* fs = hdl->fs;
-    ssize_t ret = -EACCES;
+    ssize_t ret         = -EACCES;
 
     if (!(hdl->acc_mode & MAY_WRITE)) {
         ret = -EBADF;
@@ -339,7 +338,7 @@ long libos_syscall_pwrite64(int fd, char* buf, size_t count, loff_t offset) {
      * Gramine complies with this behavior, see implementations of the write() callback.
      */
     file_off_t pos = offset;
-    ret = fs->fs_ops->write(hdl, buf, count, &pos);
+    ret            = fs->fs_ops->write(hdl, buf, count, &pos);
 out:
     put_handle(hdl);
     return ret;
@@ -403,18 +402,18 @@ static ssize_t do_getdents(int fd, uint8_t* buf, size_t buf_size, bool is_getden
         size_t name_len;
 
         if (hdl->pos == 0) {
-            name = ".";
+            name     = ".";
             name_len = 1;
         } else if (hdl->pos == 1) {
-            name = "..";
+            name     = "..";
             name_len = 2;
         } else {
-            name = dent->name;
+            name     = dent->name;
             name_len = dent->name_len;
         }
 
         uint64_t d_ino = dentry_ino(dent);
-        char d_type = get_dirent_type(dent->inode->type);
+        char d_type    = get_dirent_type(dent->inode->type);
 
         size_t ent_size;
 
@@ -425,30 +424,29 @@ static ssize_t do_getdents(int fd, uint8_t* buf, size_t buf_size, bool is_getden
                 break;
 
             struct linux_dirent64* ent = (struct linux_dirent64*)(buf + buf_pos);
-            memset(ent, 0, ent_size); // this ensures `name` will be null-terminated
+            memset(ent, 0, ent_size);  // this ensures `name` will be null-terminated
 
-            ent->d_ino = d_ino;
-            ent->d_off = hdl->pos;
+            ent->d_ino    = d_ino;
+            ent->d_off    = hdl->pos;
             ent->d_reclen = ent_size;
-            ent->d_type = d_type;
+            ent->d_type   = d_type;
             memcpy(&ent->d_name, name, name_len);
         } else {
             /* Note that `struct linux_dirent_tail` starts with a zero padding byte, so we don't
              * need to account for extra null byte at the end of `name`. */
-            ent_size = ALIGN_UP(
-                sizeof(struct linux_dirent) + sizeof(struct linux_dirent_tail) + name_len,
-                alignof(struct linux_dirent)
-            );
+            ent_size =
+                ALIGN_UP(sizeof(struct linux_dirent) + sizeof(struct linux_dirent_tail) + name_len,
+                         alignof(struct linux_dirent));
             if (buf_pos + ent_size > buf_size)
                 break;
 
             struct linux_dirent* ent = (struct linux_dirent*)(buf + buf_pos);
             struct linux_dirent_tail* tail =
                 (struct linux_dirent_tail*)(buf + buf_pos + ent_size - sizeof(*tail));
-            memset(ent, 0, ent_size); // this ensures `name` will be null-terminated
+            memset(ent, 0, ent_size);  // this ensures `name` will be null-terminated
 
-            ent->d_ino = d_ino;
-            ent->d_off = hdl->pos;
+            ent->d_ino    = d_ino;
+            ent->d_off    = hdl->pos;
             ent->d_reclen = ent_size;
             memcpy(&ent->d_name, name, name_len);
             tail->d_type = d_type;

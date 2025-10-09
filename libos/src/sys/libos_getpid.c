@@ -11,8 +11,10 @@
 #include "libos_table.h"
 #include "libos_thread.h"
 #include "libos_types.h"
+#include "log.h"
 
 long libos_syscall_getpid(void) {
+    log_always("[i] From getpid syscall, pid = %ld", (long)g_process.pid);
     return g_process.pid;
 }
 
@@ -28,7 +30,7 @@ long libos_syscall_getppid(void) {
 long libos_syscall_set_tid_address(int* tidptr) {
     struct libos_thread* cur = get_cur_thread();
     lock(&cur->lock);
-    cur->clear_child_tid = tidptr; // will be lazy-verified (before writing to it)
+    cur->clear_child_tid = tidptr;  // will be lazy-verified (before writing to it)
     unlock(&cur->lock);
     return cur->tid;
 }
@@ -77,7 +79,7 @@ long libos_syscall_getpgrp(void) {
 long libos_syscall_setsid(void) {
     rwlock_write_lock(&g_process_id_lock);
 
-    IDTYPE current_pid = g_process.pid;
+    IDTYPE current_pid  = g_process.pid;
     IDTYPE current_pgid = g_process.pgid;
 
     /* Fail if the calling process is already a process group leader. */
@@ -91,7 +93,7 @@ long libos_syscall_setsid(void) {
 
     /* The calling process is the leader of the new session and the process group leader of the new
      * process group. */
-    g_process.sid = current_pid;
+    g_process.sid  = current_pid;
     g_process.pgid = current_pid;
 
     rwlock_write_unlock(&g_process_id_lock);

@@ -183,8 +183,6 @@ int PalStreamWrite(PAL_HANDLE handle, uint64_t offset, size_t* count, void* buff
         return PAL_ERROR_INVAL;
     }
 
-    log_always("From Write Syscall");
-
     int64_t ret = _PalStreamWrite(handle, offset, *count, buffer);
 
     if (ret < 0) {
