@@ -12,8 +12,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define SRV_IP "127.0.0.1"
-#define PORT 9930
+#define SRV_IP      "127.0.0.1"
+#define PORT        9930
 #define PACKET_SIZE 0x40
 
 static struct {
@@ -24,16 +24,25 @@ static struct {
     int expected_flags;
 } g_test_cases[] = {
     {
-        .send_size = PACKET_SIZE, .recv_size = PACKET_SIZE / 2, .recv_flags = 0,
-        .expected_return_value = PACKET_SIZE / 2, .expected_flags = MSG_TRUNC,
+        .send_size             = PACKET_SIZE,
+        .recv_size             = PACKET_SIZE / 2,
+        .recv_flags            = 0,
+        .expected_return_value = PACKET_SIZE / 2,
+        .expected_flags        = MSG_TRUNC,
     },
     {
-        .send_size = PACKET_SIZE, .recv_size = PACKET_SIZE / 2, .recv_flags = MSG_TRUNC,
-        .expected_return_value = PACKET_SIZE, .expected_flags = MSG_TRUNC,
+        .send_size             = PACKET_SIZE,
+        .recv_size             = PACKET_SIZE / 2,
+        .recv_flags            = MSG_TRUNC,
+        .expected_return_value = PACKET_SIZE,
+        .expected_flags        = MSG_TRUNC,
     },
     {
-        .send_size = PACKET_SIZE / 2, .recv_size = PACKET_SIZE, .recv_flags = MSG_TRUNC,
-        .expected_return_value = PACKET_SIZE / 2, .expected_flags = 0,
+        .send_size             = PACKET_SIZE / 2,
+        .recv_size             = PACKET_SIZE,
+        .recv_flags            = MSG_TRUNC,
+        .expected_return_value = PACKET_SIZE / 2,
+        .expected_flags        = 0,
     },
 };
 
@@ -44,16 +53,17 @@ static void server(int pipefd) {
 
     struct sockaddr_in sa = {
         .sin_family = AF_INET,
-        .sin_port = htons(PORT),
-        .sin_addr = {
-            .s_addr = htonl(INADDR_ANY),
-        },
+        .sin_port   = htons(PORT),
+        .sin_addr =
+            {
+                .s_addr = htonl(INADDR_ANY),
+            },
     };
 
     if (bind(s, (struct sockaddr*)&sa, sizeof(sa)) < 0)
         err(EXIT_FAILURE, "server bind");
 
-    char byte = 0;
+    char byte       = 0;
     ssize_t written = write(pipefd, &byte, sizeof(byte));
     if (written < 0) {
         err(EXIT_FAILURE, "server write on pipe");
@@ -70,10 +80,10 @@ static void server(int pipefd) {
         }
         struct iovec iovec = {
             .iov_base = buf,
-            .iov_len = g_test_cases[i].recv_size,
+            .iov_len  = g_test_cases[i].recv_size,
         };
         struct msghdr msg = {
-            .msg_iov = &iovec,
+            .msg_iov    = &iovec,
             .msg_iovlen = 1,
         };
         ssize_t size = recvmsg(s, &msg, g_test_cases[i].recv_flags);
@@ -96,7 +106,7 @@ static void server(int pipefd) {
 }
 
 static void client(int pipefd) {
-    char byte = 0;
+    char byte        = 0;
     ssize_t received = read(pipefd, &byte, sizeof(byte));
     if (received < 0) {
         err(EXIT_FAILURE, "client read on pipe");
@@ -110,7 +120,7 @@ static void client(int pipefd) {
 
     struct sockaddr_in sa = {
         .sin_family = AF_INET,
-        .sin_port = htons(PORT),
+        .sin_port   = htons(PORT),
     };
     if (inet_aton(SRV_IP, &sa.sin_addr) != 1)
         errx(EXIT_FAILURE, "client inet_aton");
@@ -120,8 +130,8 @@ static void client(int pipefd) {
         if (!buf) {
             err(EXIT_FAILURE, "case %zu: malloc failed", i);
         }
-        ssize_t size = sendto(s, buf, g_test_cases[i].send_size, /*flags=*/0, (void*)&sa,
-                              sizeof(sa));
+        ssize_t size =
+            sendto(s, buf, g_test_cases[i].send_size, /*flags=*/0, (void*)&sa, sizeof(sa));
         if (size < 0) {
             err(EXIT_FAILURE, "case %zu: sendto failed", i);
         }

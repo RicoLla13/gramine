@@ -3,20 +3,22 @@
  *                    Borys Popławski <borysp@invisiblethingslab.com>
  */
 
+#include "libos_process.h"
+
 #include "api.h"
 #include "libos_checkpoint.h"
 #include "libos_fs.h"
 #include "libos_handle.h"
 #include "libos_lock.h"
-#include "libos_process.h"
 #include "libos_rwlock.h"
 #include "libos_signal.h"
 #include "libos_thread.h"
 #include "list.h"
+#include "log.h"
 
 typedef bool (*child_cmp_t)(const struct libos_child_process*, unsigned long);
 
-struct libos_process g_process = { .pid = 0 };
+struct libos_process g_process = {.pid = 0};
 struct libos_rwlock g_process_id_lock;
 
 int init_process(void) {
@@ -130,20 +132,20 @@ static bool cmp_child_by_pid(const struct libos_child_process* child, unsigned l
 
 static bool mark_child_exited(child_cmp_t child_cmp, unsigned long arg, IDTYPE child_uid,
                               int exit_code, int signal) {
-    bool ret = false;
-    int parent_signal = 0;
-    IDTYPE child_pid = 0;
+    bool ret                              = false;
+    int parent_signal                     = 0;
+    IDTYPE child_pid                      = 0;
     struct libos_thread_queue* wait_queue = NULL;
 
     lock(&g_process.children_lock);
 
     struct libos_child_process* child = NULL;
-    struct libos_child_process* tmp = NULL;
+    struct libos_child_process* tmp   = NULL;
     LISTP_FOR_EACH_ENTRY_SAFE(child, tmp, &g_process.children, list) {
         if (child_cmp(child, arg)) {
-            child->exit_code = exit_code;
+            child->exit_code   = exit_code;
             child->term_signal = signal;
-            child->uid = child_uid;
+            child->uid         = child_uid;
 
             LISTP_DEL(child, &g_process.children, list);
             /* TODO: if SIGCHLD is ignored or has SA_NOCLDWAIT flag set, then the child should not
@@ -151,9 +153,9 @@ static bool mark_child_exited(child_cmp_t child_cmp, unsigned long arg, IDTYPE c
             LISTP_ADD(child, &g_process.zombies, list);
 
             parent_signal = child->child_termination_signal;
-            child_pid = child->pid;
+            child_pid     = child->pid;
 
-            wait_queue = g_process.wait_queue;
+            wait_queue           = g_process.wait_queue;
             g_process.wait_queue = NULL;
 
             ret = true;
@@ -165,9 +167,9 @@ static bool mark_child_exited(child_cmp_t child_cmp, unsigned long arg, IDTYPE c
      * see 0 pending signals but still get an exited child info. */
     if (parent_signal) {
         siginfo_t info = {0};
-        info.si_signo = parent_signal;
-        info.si_pid = child_pid;
-        info.si_uid = child_uid;
+        info.si_signo  = parent_signal;
+        info.si_pid    = child_pid;
+        info.si_uid    = child_uid;
         fill_siginfo_code_and_status(&info, signal, exit_code);
         int x = kill_current_proc(&info);
         if (x < 0) {
@@ -179,7 +181,7 @@ static bool mark_child_exited(child_cmp_t child_cmp, unsigned long arg, IDTYPE c
 
     while (wait_queue) {
         struct libos_thread_queue* next = wait_queue->next;
-        struct libos_thread* thread = wait_queue->thread;
+        struct libos_thread* thread     = wait_queue->thread;
         __atomic_store_n(&wait_queue->in_use, false, __ATOMIC_RELEASE);
         /* In theory the atomic release store above does not prevent hoisting of code to before it.
          * Here we rely on the order: first store to `in_use`, then wake the thread. Let's add
@@ -226,8 +228,8 @@ BEGIN_CP_FUNC(process_description) {
 
     struct libos_process* process = (struct libos_process*)obj;
 
-    size_t children_count = 0;
-    size_t zombies_count = 0;
+    size_t children_count             = 0;
+    size_t zombies_count              = 0;
     struct libos_child_process* child = NULL;
     LISTP_FOR_EACH_ENTRY(child, &process->children, list) {
         ++children_count;
@@ -237,25 +239,24 @@ BEGIN_CP_FUNC(process_description) {
         ++zombies_count;
     }
 
-    size_t off = ADD_CP_OFFSET(sizeof(struct libos_process) + sizeof(children_count)
-                               + children_count * sizeof(*child)
-                               + sizeof(zombies_count)
-                               + zombies_count * sizeof(*zombie));
+    size_t off     = ADD_CP_OFFSET(sizeof(struct libos_process) + sizeof(children_count) +
+                                   children_count * sizeof(*child) + sizeof(zombies_count) +
+                                   zombies_count * sizeof(*zombie));
     char* data_ptr = (char*)(base + off);
     struct libos_process* new_process = (struct libos_process*)data_ptr;
     data_ptr += sizeof(*new_process);
 
     memset(new_process, '\0', sizeof(*new_process));
 
-    new_process->pid = process->pid;
+    new_process->pid  = process->pid;
     new_process->ppid = process->ppid;
     new_process->pgid = process->pgid;
-    new_process->sid = process->sid;
+    new_process->sid  = process->sid;
 
     /* copy cmdline (used by /proc/[pid]/cmdline) from the current process */
     char* new_cmdline = (char*)(base + ADD_CP_OFFSET(g_process.cmdline_size));
     memcpy(new_cmdline, g_process.cmdline, g_process.cmdline_size);
-    new_process->cmdline = new_cmdline;
+    new_process->cmdline      = new_cmdline;
     new_process->cmdline_size = g_process.cmdline_size;
 
     DO_CP_MEMBER(dentry, process, new_process, root);
@@ -334,7 +335,7 @@ BEGIN_RS_FUNC(process_description) {
     INIT_LISTP(&process->children);
     INIT_LISTP(&process->zombies);
 
-    char* data_ptr = (char*)process + sizeof(*process);
+    char* data_ptr        = (char*)process + sizeof(*process);
     size_t children_count = *(size_t*)data_ptr;
     data_ptr += sizeof(children_count);
     struct libos_child_process* children = (struct libos_child_process*)data_ptr;

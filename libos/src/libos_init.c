@@ -18,6 +18,7 @@
 #include "libos_ipc.h"
 #include "libos_lock.h"
 #include "libos_process.h"
+#include "libos_remote.h"
 #include "libos_sync.h"
 #include "libos_tcb.h"
 #include "libos_thread.h"
@@ -31,7 +32,7 @@
 static_assert(sizeof(libos_tcb_t) <= PAL_LIBOS_TCB_SIZE,
               "libos_tcb_t does not fit into PAL_TCB; please increase PAL_LIBOS_TCB_SIZE");
 
-const toml_table_t* g_manifest_root = NULL;
+const toml_table_t* g_manifest_root         = NULL;
 struct pal_public_state* g_pal_public_state = NULL;
 
 /* This function is used by stack protector's __stack_chk_fail(), _FORTIFY_SOURCE's *_chk()
@@ -95,7 +96,7 @@ char** g_library_paths = NULL;
 static void* allocate_stack(size_t size, size_t protect_size, bool user) {
     void* stack = NULL;
 
-    size = ALLOC_ALIGN_UP(size);
+    size         = ALLOC_ALIGN_UP(size);
     protect_size = ALLOC_ALIGN_UP(protect_size);
 
     if (!user) {
@@ -109,15 +110,15 @@ static void* allocate_stack(size_t size, size_t protect_size, bool user) {
     }
 
     /* reserve non-readable non-writable page below the user stack to catch stack overflows */
-    int ret = bkeep_mmap_any_aslr(size + protect_size, PROT_NONE,
-                                  MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN, NULL, 0, "stack",
-                                  &stack);
+    int ret =
+        bkeep_mmap_any_aslr(size + protect_size, PROT_NONE,
+                            MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN, NULL, 0, "stack", &stack);
     if (ret < 0) {
         return NULL;
     }
 
     bool need_mem_free = false;
-    ret = PalVirtualMemoryAlloc(stack, size + protect_size, /*prot=*/0);
+    ret                = PalVirtualMemoryAlloc(stack, size + protect_size, /*prot=*/0);
     if (ret < 0) {
         goto out_fail;
     }
@@ -205,7 +206,7 @@ static int populate_stack(void* stack, size_t stack_size, const char* const* arg
      *   - memory at high addresses contains buffers with argv + envp strings
      *   - memory at low addresses contains argc and pointer-arrays of argv, envp, and auxv */
     long* argc_ptr = ALLOCATE_FROM_LOW_ADDR(sizeof(long));
-    *argc_ptr = argc;
+    *argc_ptr      = argc;
 
     /* pre-allocate enough space to hold all argv strings */
     char* argv_str = ALLOCATE_FROM_HIGH_ADDR(argv_size);
@@ -215,7 +216,7 @@ static int populate_stack(void* stack, size_t stack_size, const char* const* arg
      * located adjacently and (2) in increasing order. */
     char** new_argv = stack_low_addr;
     for (const char* const* a = argv; *a; a++) {
-        size_t size = strlen(*a) + 1;
+        size_t size     = strlen(*a) + 1;
         char** argv_ptr = ALLOCATE_FROM_LOW_ADDR(sizeof(char*)); /* ptr to argv[i] */
         memcpy(argv_str, *a, size);                              /* argv[i] string */
         *argv_ptr = argv_str;
@@ -232,7 +233,7 @@ static int populate_stack(void* stack, size_t stack_size, const char* const* arg
 
     char** new_envp = stack_low_addr;
     for (const char* const* e = envp; *e; e++) {
-        size_t size = strlen(*e) + 1;
+        size_t size     = strlen(*e) + 1;
         char** envp_ptr = ALLOCATE_FROM_LOW_ADDR(sizeof(char*)); /* ptr to envp[i] */
         memcpy(envp_str, *e, size);                              /* envp[i] string */
         *envp_ptr = envp_str;
@@ -241,8 +242,8 @@ static int populate_stack(void* stack, size_t stack_size, const char* const* arg
     *((char**)ALLOCATE_FROM_LOW_ADDR(sizeof(char*))) = NULL;
 
     /* reserve space for ELF aux vectors, populated later in execute_elf_object() */
-    elf_auxv_t* new_auxv = ALLOCATE_FROM_LOW_ADDR(REQUIRED_ELF_AUXV * sizeof(elf_auxv_t) +
-                                                  REQUIRED_ELF_AUXV_SPACE);
+    elf_auxv_t* new_auxv =
+        ALLOCATE_FROM_LOW_ADDR(REQUIRED_ELF_AUXV * sizeof(elf_auxv_t) + REQUIRED_ELF_AUXV_SPACE);
 
     /* we have now low part of stack (with argc and pointer-arrays of argv, envp, auxv), high part
      * of stack (with argv and envp strings) and an empty space in the middle: we must remove the
@@ -257,9 +258,9 @@ static int populate_stack(void* stack, size_t stack_size, const char* const* arg
     /* pointer-arrays of argv, envp, and auxv were allocated on low part of stack and shifted via
      * memmove above, need to shift pointers to their bases */
     size_t shift = new_stack_low_addr - stack;
-    new_argv = (void*)new_argv + shift;
-    new_envp = (void*)new_envp + shift;
-    new_auxv = (void*)new_auxv + shift;
+    new_argv     = (void*)new_argv + shift;
+    new_envp     = (void*)new_envp + shift;
+    new_auxv     = (void*)new_auxv + shift;
 
     /* clear working area at the bottom */
     memset(stack, 0, shift);
@@ -300,7 +301,7 @@ int init_stack(const char* const* argv, const char* const* envp, char*** out_arg
     if (!cur_thread || cur_thread->stack)
         return 0;
 
-    stack_size = ALLOC_ALIGN_UP(stack_size);
+    stack_size  = ALLOC_ALIGN_UP(stack_size);
     void* stack = allocate_stack(stack_size, ALLOC_ALIGNMENT, /*user=*/true);
     if (!stack)
         return -ENOMEM;
@@ -325,7 +326,7 @@ static int read_environs(const char* const* envp) {
         if (strstartswith(*e, "LD_LIBRARY_PATH=")) {
             /* populate `g_library_paths` with entries from LD_LIBRARY_PATH envvar */
             const char* s = *e + static_strlen("LD_LIBRARY_PATH=");
-            size_t npaths = 2; // One for the first entry, one for the last NULL.
+            size_t npaths = 2;  // One for the first entry, one for the last NULL.
             for (const char* tmp = s; *tmp; tmp++)
                 if (*tmp == ':')
                     npaths++;
@@ -336,17 +337,15 @@ static int read_environs(const char* const* envp) {
             size_t cnt = 0;
             while (*s) {
                 const char* next;
-                for (next = s; *next && *next != ':'; next++)
-                    ;
+                for (next = s; *next && *next != ':'; next++);
                 char* str = alloc_substr(s, next - s);
                 if (!str) {
-                    for (size_t i = 0; i < cnt; i++)
-                        free(paths[i]);
+                    for (size_t i = 0; i < cnt; i++) free(paths[i]);
                     free(paths);
                     return -ENOMEM;
                 }
                 paths[cnt++] = str;
-                s = *next ? next + 1 : next;
+                s            = *next ? next + 1 : next;
             }
 
             paths[cnt] = NULL;
@@ -362,14 +361,13 @@ static int read_environs(const char* const* envp) {
 
 #define CALL_INIT(func, args...) func(args)
 
-#define RUN_INIT(func, ...)                                                 \
-    do {                                                                    \
-        int _err = CALL_INIT(func, ##__VA_ARGS__);                          \
-        if (_err < 0) {                                                     \
-            log_error("libos_init() failed in " #func ": %s",               \
-                      unix_strerror(_err));                                 \
-            PalProcessExit(1);                                              \
-        }                                                                   \
+#define RUN_INIT(func, ...)                                                         \
+    do {                                                                            \
+        int _err = CALL_INIT(func, ##__VA_ARGS__);                                  \
+        if (_err < 0) {                                                             \
+            log_error("libos_init() failed in " #func ": %s", unix_strerror(_err)); \
+            PalProcessExit(1);                                                      \
+        }                                                                           \
     } while (0)
 
 noreturn void libos_init(const char* const* argv, const char* const* envp) {
@@ -447,6 +445,7 @@ noreturn void libos_init(const char* const* argv, const char* const* envp) {
 
     RUN_INIT(init_ipc);
     RUN_INIT(init_process);
+    // RUN_INIT(init_remote_socket);
     RUN_INIT(init_threading);
     RUN_INIT(init_mount_root);
     RUN_INIT(init_mount);
@@ -486,28 +485,26 @@ noreturn void libos_init(const char* const* argv, const char* const* envp) {
         /* Send a dummy request causing the IPC leader to connect to this process, so that it is
          * included in all broadcast messages. */
         IDTYPE dummy = 0;
-        ret = ipc_get_id_owner(/*id=*/0, /*out_owner=*/&dummy);
+        ret          = ipc_get_id_owner(/*id=*/0, /*out_owner=*/&dummy);
         if (ret < 0) {
             log_debug("libos_init: failed to get a connection from IPC leader to us: %s",
                       unix_strerror(ret));
             PalProcessExit(1);
         }
-        assert(dummy == 0); // Nobody should own ID `0`.
+        assert(dummy == 0);  // Nobody should own ID `0`.
 
         /* Notify the parent process we are done. */
         char dummy_c = 0;
-        ret = write_exact(g_pal_public_state->parent_process, &dummy_c, sizeof(dummy_c));
+        ret          = write_exact(g_pal_public_state->parent_process, &dummy_c, sizeof(dummy_c));
         if (ret < 0) {
-            log_error("libos_init: failed to write ready notification: %s",
-                      unix_strerror(ret));
+            log_error("libos_init: failed to write ready notification: %s", unix_strerror(ret));
             PalProcessExit(1);
         }
 
         /* Wait for parent to settle its adult things. */
         ret = read_exact(g_pal_public_state->parent_process, &dummy_c, sizeof(dummy_c));
         if (ret < 0) {
-            log_error("libos_init: failed to read parent's confirmation: %s",
-                      unix_strerror(ret));
+            log_error("libos_init: failed to read parent's confirmation: %s", unix_strerror(ret));
             PalProcessExit(1);
         }
     } else { /* !g_pal_public_state->parent_process */
@@ -602,7 +599,7 @@ int create_pipe(char* name, char* uri, size_t size, PAL_HANDLE* hdl, bool use_vm
 
     /* output generated pipe handle, URI, and name */
     *hdl = pipe;
-    len = snprintf(uri, size, URI_PREFIX_PIPE "%lu/%s", g_pal_public_state->instance_id, pipename);
+    len  = snprintf(uri, size, URI_PREFIX_PIPE "%lu/%s", g_pal_public_state->instance_id, pipename);
     static_assert(static_strlen(URI_PREFIX_PIPE) < static_strlen(URI_PREFIX_PIPE_SRV),
                   "without this condition the assert below should be changed into an `if`");
     assert(len < size); /* must hold because above we did the same but with longer prefix */
