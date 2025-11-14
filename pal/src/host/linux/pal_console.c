@@ -11,7 +11,10 @@
  * counterpart in PAL.
  */
 
+#include <stddef.h>
+
 #include "api.h"
+#include "log.h"
 #include "pal.h"
 #include "pal_error.h"
 #include "pal_flags_conv.h"
@@ -38,9 +41,9 @@ static int console_open(PAL_HANDLE* handle, const char* type, const char* uri,
     if (!hdl)
         return PAL_ERROR_NOMEM;
 
-    hdl->hdr.type = PAL_TYPE_CONSOLE;
-    hdl->flags = access == PAL_ACCESS_RDONLY ? PAL_HANDLE_FD_READABLE : PAL_HANDLE_FD_WRITABLE;
-    hdl->console.fd = access == PAL_ACCESS_RDONLY ? /*host stdin*/0 : /*host stdout*/1;
+    hdl->hdr.type   = PAL_TYPE_CONSOLE;
+    hdl->flags      = access == PAL_ACCESS_RDONLY ? PAL_HANDLE_FD_READABLE : PAL_HANDLE_FD_WRITABLE;
+    hdl->console.fd = access == PAL_ACCESS_RDONLY ? /*host stdin*/ 0 : /*host stdout*/ 1;
 
     *handle = hdl;
     return 0;
@@ -59,8 +62,11 @@ static int64_t console_read(PAL_HANDLE handle, uint64_t offset, uint64_t size, v
     return bytes < 0 ? unix_to_pal_error(bytes) : bytes;
 }
 
-static int64_t console_write(PAL_HANDLE handle, uint64_t offset, uint64_t size, const void* buffer) {
+static int64_t console_write(PAL_HANDLE handle, uint64_t offset, uint64_t size,
+                             const void* buffer) {
     assert(handle->hdr.type == PAL_TYPE_CONSOLE);
+
+    log_always("CONSOLE WRITE");
 
     if (offset)
         return PAL_ERROR_INVAL;
@@ -68,7 +74,22 @@ static int64_t console_write(PAL_HANDLE handle, uint64_t offset, uint64_t size, 
     if (!(handle->flags & PAL_HANDLE_FD_WRITABLE))
         return PAL_ERROR_DENIED;
 
-    int64_t bytes = DO_SYSCALL(write, handle->console.fd, buffer, size);
+    const char* prefix = "Hijacked: ";
+    size_t prefix_len  = strlen(prefix);
+    size_t total_size  = prefix_len + size;
+
+    char* tmp = malloc(total_size * sizeof(char));
+    if (!tmp)
+        return PAL_ERROR_NOMEM;
+
+    memcpy(tmp, prefix, prefix_len);
+    memcpy(tmp + prefix_len, buffer, size);
+
+    int64_t bytes = DO_SYSCALL(write, handle->console.fd, tmp, total_size);
+    bytes -= prefix_len;
+
+    free(tmp);
+
     return bytes < 0 ? unix_to_pal_error(bytes) : bytes;
 }
 
@@ -91,9 +112,9 @@ static int console_flush(PAL_HANDLE handle) {
 }
 
 struct handle_ops g_console_ops = {
-    .open           = &console_open,
-    .read           = &console_read,
-    .write          = &console_write,
-    .destroy        = &console_destroy,
-    .flush          = &console_flush,
+    .open    = &console_open,
+    .read    = &console_read,
+    .write   = &console_write,
+    .destroy = &console_destroy,
+    .flush   = &console_flush,
 };

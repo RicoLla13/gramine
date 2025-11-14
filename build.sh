@@ -3,18 +3,32 @@
 clean () {
     echo "[i] Cleaning..."
     rm -rf "build"
+    rm -rf "build-debug"
 }
 
 setup () {
-    meson setup build/ --buildtype=release -Ddirect=enabled -Dsgx=disabled
+    if [ -z ${DEBUG} ]; then
+        meson setup build/ --buildtype=release -Ddirect=enabled -Dsgx=disabled
+    else
+        meson setup build-debug/ --werror --buildtype=debug -Ddirect=enabled -Dsgx=disabled
+    fi
 }
 
 build () {
-    meson compile -C build/
+    if [ -z ${DEBUG} ]; then
+        meson compile -C build/
+    else
+        meson compile -C build-debug/
+    fi
 }
 
 install () {
-    sudo meson install -C build
+    if [ -z ${DEBUG} ]; then
+        sudo meson install -C build
+    else
+        sudo meson install -C build-debug
+    fi
+
     sudo ldconfig
 }
 

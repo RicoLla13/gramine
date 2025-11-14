@@ -7,6 +7,7 @@
 
 #include "api.h"
 #include "linux_utils.h"
+#include "log.h"
 #include "pal.h"
 #include "pal_error.h"
 #include "pal_flags_conv.h"
@@ -20,20 +21,19 @@ static int file_open(PAL_HANDLE* handle, const char* type, const char* uri, enum
                      pal_share_flags_t share, enum pal_create_mode create,
                      pal_stream_options_t options) {
     int ret;
-    int fd = -1;
+    int fd         = -1;
     PAL_HANDLE hdl = NULL;
-    char* path = NULL;
+    char* path     = NULL;
 
     if (strcmp(type, URI_TYPE_FILE))
         return PAL_ERROR_INVAL;
 
-    assert(WITHIN_MASK(share,   PAL_SHARE_MASK));
+    assert(WITHIN_MASK(share, PAL_SHARE_MASK));
     assert(WITHIN_MASK(options, PAL_OPTION_MASK));
 
-    ret = DO_SYSCALL(open, uri, PAL_ACCESS_TO_LINUX_OPEN(access)  |
-                                PAL_CREATE_TO_LINUX_OPEN(create)  |
-                                PAL_OPTION_TO_LINUX_OPEN(options) |
-                                O_CLOEXEC,
+    ret = DO_SYSCALL(open, uri,
+                     PAL_ACCESS_TO_LINUX_OPEN(access) | PAL_CREATE_TO_LINUX_OPEN(create) |
+                         PAL_OPTION_TO_LINUX_OPEN(options) | O_CLOEXEC,
                      share);
     if (ret < 0)
         return unix_to_pal_error(ret);
@@ -41,7 +41,7 @@ static int file_open(PAL_HANDLE* handle, const char* type, const char* uri, enum
     fd = ret;
 
     size_t uri_size = strlen(uri) + 1;
-    hdl = calloc(1, HANDLE_SIZE(file));
+    hdl             = calloc(1, HANDLE_SIZE(file));
     if (!hdl) {
         ret = PAL_ERROR_NOMEM;
         goto fail;
@@ -94,6 +94,8 @@ static int64_t file_read(PAL_HANDLE handle, uint64_t offset, uint64_t count, voi
 }
 
 static int64_t file_write(PAL_HANDLE handle, uint64_t offset, uint64_t count, const void* buffer) {
+    log_always("FILE WRITE");
+
     int64_t ret;
     if (handle->file.seekable) {
         ret = DO_SYSCALL(pwrite64, handle->file.fd, buffer, count, offset);
@@ -238,7 +240,7 @@ static int dir_open(PAL_HANDLE* handle, const char* type, const char* uri, enum 
 
 static int64_t dir_read(PAL_HANDLE handle, uint64_t offset, size_t count, void* _buf) {
     size_t bytes_written = 0;
-    char* buf = (char*)_buf;
+    char* buf            = (char*)_buf;
 
     if (offset) {
         return PAL_ERROR_INVAL;
@@ -257,7 +259,7 @@ static int64_t dir_read(PAL_HANDLE handle, uint64_t offset, size_t count, void* 
             }
 
             bool is_dir = dirent->d_type == DT_DIR;
-            size_t len = strlen(dirent->d_name);
+            size_t len  = strlen(dirent->d_name);
 
             if (len + 1 + (is_dir ? 1 : 0) > count) {
                 goto out;
